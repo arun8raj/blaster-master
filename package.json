@@ -1,0 +1,17 @@
+{
+  "name": "math-blaster",
+  "version": "1.0.0",
+  "description": "Math Blaster – a full-stack browser math arcade game for 1-5 graders",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

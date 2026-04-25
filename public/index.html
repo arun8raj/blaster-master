@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Math Blaster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d1a;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      font-family: 'Nunito', sans-serif;
+      overflow: hidden;
+    }
+
+    #game-container canvas {
+      display: block;
+    }
+
+    /* ── Leaderboard overlay ──────────────────────────────────── */
+    #lb-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.82);
+      z-index: 999;
+      justify-content: center;
+      align-items: center;
+    }
+    #lb-overlay.visible { display: flex; }
+
+    #lb-panel {
+      background: linear-gradient(160deg, #1e2a4a 0%, #0f1730 100%);
+      border: 3px solid #f7c948;
+      border-radius: 20px;
+      padding: 32px 36px;
+      min-width: 360px;
+      max-width: 520px;
+      width: 90vw;
+      color: #fff;
+      box-shadow: 0 0 40px rgba(247,201,72,0.3);
+    }
+
+    #lb-panel h2 {
+      font-family: 'Fredoka One', cursive;
+      font-size: 2rem;
+      color: #f7c948;
+      text-align: center;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+    }
+
+    #lb-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    #lb-table thead tr {
+      border-bottom: 2px solid #f7c948;
+      color: #f7c948;
+    }
+
+    #lb-table th, #lb-table td {
+      padding: 7px 6px;
+      text-align: left;
+    }
+
+    #lb-table tbody tr:nth-child(even) {
+      background: rgba(255,255,255,0.05);
+    }
+
+    #lb-table tbody tr.highlight {
+      background: rgba(247,201,72,0.18);
+      font-weight: 700;
+      color: #f7c948;
+    }
+
+    #lb-table .rank-col { text-align: center; width: 36px; }
+    #lb-table .score-col { text-align: right; }
+
+    #lb-close-btn {
+      display: block;
+      margin: 22px auto 0;
+      padding: 10px 36px;
+      background: #f7c948;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 30px;
+      font-family: 'Fredoka One', cursive;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: transform 0.1s, background 0.15s;
+    }
+    #lb-close-btn:hover { background: #ffe066; transform: scale(1.04); }
+
+    #lb-empty {
+      text-align: center;
+      color: #aaa;
+      padding: 24px 0;
+      font-size: 1rem;
+    }
+
+    /* ── Nickname / menu DOM form ─────────────────────────────── */
+    #menu-form {
+      display: none; /* shown by MenuScene */
+      position: absolute;
+      z-index: 10;
+      pointer-events: all;
+    }
+
+    #nickname-input {
+      font-family: 'Nunito', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 10px 16px;
+      border-radius: 30px;
+      border: 3px solid #f7c948;
+      background: #1e2a4a;
+      color: #fff;
+      width: 220px;
+      text-align: center;
+      outline: none;
+      caret-color: #f7c948;
+    }
+    #nickname-input::placeholder { color: #7080a0; }
+    #nickname-input:focus { border-color: #ffe066; box-shadow: 0 0 12px rgba(247,201,72,0.5); }
+
+    #nick-error {
+      color: #ff6b6b;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-align: center;
+      margin-top: 4px;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Nickname input overlay (positioned by MenuScene) -->
+  <div id="menu-form">
+    <input id="nickname-input" type="text" maxlength="12"
+           placeholder="Your nickname…"
+           autocomplete="off" spellcheck="false" />
+    <div id="nick-error"></div>
+  </div>
+
+  <!-- Leaderboard overlay -->
+  <div id="lb-overlay">
+    <div id="lb-panel">
+      <h2>🏆 Leaderboard</h2>
+      <div id="lb-content">
+        <p id="lb-empty">Loading…</p>
+        <table id="lb-table" style="display:none">
+          <thead>
+            <tr>
+              <th class="rank-col">#</th>
+              <th>Player</th>
+              <th>Character</th>
+              <th class="score-col">Score</th>
+              <th>Level</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="lb-tbody"></tbody>
+        </table>
+      </div>
+      <button id="lb-close-btn">Close</button>
+    </div>
+  </div>
+
+  <!-- Phaser game canvas -->
+  <div id="game-container"></div>
+
+  <!-- Load order: Phaser → scenes → game bootstrap -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <script src="scenes/MenuScene.js"></script>
+  <script src="scenes/GameScene.js"></script>
+  <script src="scenes/LevelCompleteScene.js"></script>
+  <script src="scenes/GameOverScene.js"></script>
+  <script src="game.js"></script>
+
+  <script>
+    /* ── Global leaderboard helpers (called from any scene) ───── */
+    let _lbCloseCallback = null;
+
+    window.showLeaderboard = async function(highlightNickname, onClose) {
+      _lbCloseCallback = onClose || null;
+      const overlay = document.getElementById('lb-overlay');
+      const empty   = document.getElementById('lb-empty');
+      const table   = document.getElementById('lb-table');
+      const tbody   = document.getElementById('lb-tbody');
+
+      empty.textContent = 'Loading…';
+      table.style.display = 'none';
+      tbody.innerHTML = '';
+      overlay.classList.add('visible');
+
+      try {
+        const res = await fetch('/api/leaderboard');
+        const rows = await res.json();
+        if (!rows.length) {
+          empty.textContent = 'No scores yet. Be the first!';
+          return;
+        }
+        empty.style.display = 'none';
+        table.style.display = 'table';
+        rows.forEach((r, i) => {
+          const tr = document.createElement('tr');
+          if (highlightNickname && r.nickname === highlightNickname) {
+            tr.classList.add('highlight');
+          }
+          tr.innerHTML = `
+            <td class="rank-col">${i + 1}</td>
+            <td>${escHtml(r.nickname)}</td>
+            <td>${escHtml(r.character)}</td>
+            <td class="score-col">${r.score}</td>
+            <td>${r.level_reached}</td>
+            <td>${r.played_at || ''}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch {
+        empty.textContent = 'Could not load scores.';
+        empty.style.display = '';
+      }
+    };
+
+    window.closeLeaderboard = function() {
+      document.getElementById('lb-overlay').classList.remove('visible');
+      document.getElementById('lb-empty').style.display = '';
+      if (_lbCloseCallback) { _lbCloseCallback(); _lbCloseCallback = null; }
+    };
+
+    document.getElementById('lb-close-btn').addEventListener('click', window.closeLeaderboard);
+    document.getElementById('lb-overlay').addEventListener('click', function(e) {
+      if (e.target === this) window.closeLeaderboard();
+    });
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* ── Save score helper ─────────────────────────────────────── */
+    window.saveScore = async function({ nickname, character, score, level_reached }) {
+      try {
+        const res = await fetch('/api/scores', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname, character, score, level_reached })
+        });
+        return await res.json(); // { id, rank }
+      } catch {
+        return { rank: null };
+      }
+    };
+  </script>
+</body>
+</html>
